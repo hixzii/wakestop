@@ -34,16 +34,20 @@
             flex-direction: column;
         }
 
-        /* Header */
+        /* Header - floating pill */
         .header {
-            background: #16213e;
-            padding: 12px 16px;
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: rgba(22, 33, 62, 0.95);
+            padding: 8px 14px;
             display: flex;
             align-items: center;
-            justify-content: space-between;
-            border-bottom: 1px solid #0f3460;
-            flex-shrink: 0;
+            gap: 12px;
+            border-radius: 24px;
             z-index: 1000;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
         }
 
         .header-left {
@@ -53,7 +57,7 @@
         }
 
         .header h1 {
-            font-size: 20px;
+            font-size: 16px;
             font-weight: 700;
             color: #e94560;
         }
@@ -65,16 +69,16 @@
         .header-controls {
             display: flex;
             align-items: center;
-            gap: 10px;
+            gap: 8px;
         }
 
         .unit-toggle {
             background: #0f3460;
             border: none;
             color: #888;
-            font-size: 12px;
+            font-size: 11px;
             font-weight: 600;
-            padding: 4px 10px;
+            padding: 3px 8px;
             border-radius: 6px;
             cursor: pointer;
             text-transform: uppercase;
@@ -117,7 +121,7 @@
         /* Search bar */
         .search-container {
             position: absolute;
-            top: 60px;
+            top: 54px;
             left: 10px;
             right: 10px;
             z-index: 1000;
@@ -187,7 +191,7 @@
         /* Favourites bar */
         .favourites-bar {
             position: absolute;
-            top: 112px;
+            top: 106px;
             left: 10px;
             right: 10px;
             z-index: 999;
@@ -244,12 +248,22 @@
         }
 
         .panel-handle {
-            width: 40px;
-            height: 4px;
-            background: #555;
-            border-radius: 2px;
-            margin: 12px auto;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 48px;
+            height: 28px;
+            margin: 4px auto 8px;
             cursor: pointer;
+            background: #0f3460;
+            border-radius: 8px;
+            color: #888;
+            font-size: 14px;
+            line-height: 1;
+        }
+
+        .bottom-panel.collapsed .panel-handle {
+            margin-bottom: 4px;
         }
 
         .panel-content {
@@ -668,7 +682,7 @@
     <div class="favourites-bar" id="favouritesBar"></div>
 
     <div class="bottom-panel" id="bottomPanel">
-        <div class="panel-handle" id="panelHandle"></div>
+        <div class="panel-handle" id="panelHandle">&#9660;</div>
         <div class="panel-content">
         <div class="instructions" id="instructions">
             <p><strong>Search</strong> for a place or <strong>tap the map</strong> to set your destination, then hit <strong>Start</strong>.</p>
@@ -796,18 +810,21 @@
 
         // ===================== PANEL COLLAPSE =====================
         const bottomPanel = document.getElementById('bottomPanel');
+        const panelHandle = document.getElementById('panelHandle');
         let panelCollapsed = false;
 
         function collapsePanel() {
             if (panelCollapsed || tracking) return;
             panelCollapsed = true;
             bottomPanel.classList.add('collapsed');
+            panelHandle.innerHTML = '&#9650;';
         }
 
         function expandPanel() {
             if (!panelCollapsed) return;
             panelCollapsed = false;
             bottomPanel.classList.remove('collapsed');
+            panelHandle.innerHTML = '&#9660;';
         }
 
         document.getElementById('panelHandle').addEventListener('click', function(e) {
