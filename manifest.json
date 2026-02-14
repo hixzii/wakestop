@@ -1,0 +1,11 @@
+{
+    "name": "WakeStop",
+    "short_name": "WakeStop",
+    "description": "Proximity-based alarm for public transport - never miss your stop again",
+    "start_url": "index.html",
+    "display": "standalone",
+    "background_color": "#1a1a2e",
+    "theme_color": "#1a1a2e",
+    "orientation": "portrait",
+    "icons": []
+}
