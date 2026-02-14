@@ -384,6 +384,44 @@
             transform: scale(0.95);
         }
 
+        /* Alarm mode toggle */
+        .alarm-mode {
+            margin-bottom: 12px;
+        }
+
+        .alarm-mode-label {
+            font-size: 14px;
+            color: #888;
+            margin-bottom: 8px;
+        }
+
+        .alarm-mode-options {
+            display: flex;
+            gap: 6px;
+        }
+
+        .alarm-mode-btn {
+            flex: 1;
+            padding: 8px 0;
+            background: #0f3460;
+            border: none;
+            border-radius: 8px;
+            color: #888;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+
+        .alarm-mode-btn.active {
+            background: #e94560;
+            color: #fff;
+        }
+
+        .alarm-mode-btn:active {
+            transform: scale(0.95);
+        }
+
         /* Buttons */
         .btn-row {
             display: flex;
@@ -628,9 +666,18 @@
             </div>
         </div>
 
+        <div class="alarm-mode">
+            <div class="alarm-mode-label">Alarm type:</div>
+            <div class="alarm-mode-options" id="alarmModeOptions">
+                <button class="alarm-mode-btn active" data-mode="both">&#128264; + Vibrate</button>
+                <button class="alarm-mode-btn" data-mode="sound">&#128264; Sound</button>
+                <button class="alarm-mode-btn" data-mode="vibrate">Vibrate</button>
+            </div>
+        </div>
+
         <div class="btn-row">
             <button class="btn btn-clear" id="btnClear" disabled>Clear</button>
-            <button class="btn btn-test" id="btnTest">Test Alarm</button>
+            <button class="btn btn-test" id="btnTest">Test</button>
             <button class="btn btn-start" id="btnStart" disabled>Set destination</button>
             <button class="btn btn-stop" id="btnStop">Stop</button>
         </div>
@@ -665,6 +712,7 @@
         let wakeLock = null;
         let searchTimeout = null;
         let dimmed = false;
+        let alarmMode = localStorage.getItem('wakestop_alarm_mode') || 'both'; // 'both', 'sound', 'vibrate'
         let favourites = JSON.parse(localStorage.getItem('wakestop_favs') || '[]');
 
         // ===================== UNIT HELPERS =====================
@@ -915,6 +963,22 @@
             updatePresetLabels();
         }
 
+        // ===================== ALARM MODE =====================
+        const alarmModeBtns = document.querySelectorAll('.alarm-mode-btn');
+
+        // Apply saved alarm mode on load
+        alarmModeBtns.forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.mode === alarmMode);
+        });
+
+        alarmModeBtns.forEach(btn => {
+            btn.addEventListener('click', function() {
+                alarmMode = this.dataset.mode;
+                localStorage.setItem('wakestop_alarm_mode', alarmMode);
+                alarmModeBtns.forEach(b => b.classList.toggle('active', b === this));
+            });
+        });
+
         // ===================== FAVOURITES =====================
         function renderFavourites() {
             const bar = document.getElementById('favouritesBar');
@@ -1101,10 +1165,12 @@
                 `You're ${distDisplay} ${unit} from ${destination.name}`;
             document.getElementById('alarmOverlay').classList.add('active');
 
-            playAlarm();
+            if (alarmMode === 'both' || alarmMode === 'sound') {
+                playAlarm();
+            }
 
-            if (navigator.vibrate) {
-                navigator.vibrate([500, 200, 500, 200, 500, 200, 500, 200, 500, 200, 500]);
+            if (alarmMode === 'both' || alarmMode === 'vibrate') {
+                startVibration();
             }
         }
 
@@ -1113,7 +1179,31 @@
             document.getElementById('alarmOverlay').classList.remove('active');
             document.getElementById('statusDot').classList.remove('alarm');
             stopAlarm();
+            stopVibration();
             stopTracking();
+        }
+
+        // ===================== VIBRATION =====================
+        let vibrationInterval = null;
+
+        function startVibration() {
+            if (!navigator.vibrate) return;
+            navigator.vibrate([500, 200, 500, 200, 500, 200, 500]);
+            vibrationInterval = setInterval(() => {
+                if (alarmActive && navigator.vibrate) {
+                    navigator.vibrate([500, 200, 500, 200, 500, 200, 500]);
+                }
+            }, 3000);
+        }
+
+        function stopVibration() {
+            if (vibrationInterval) {
+                clearInterval(vibrationInterval);
+                vibrationInterval = null;
+            }
+            if (navigator.vibrate) {
+                navigator.vibrate(0);
+            }
         }
 
         // ===================== ALARM SOUND =====================
@@ -1176,33 +1266,37 @@
             btn.textContent = 'TESTING...';
 
             try {
-                const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-                let t = audioCtx.currentTime;
-                for (let i = 0; i < 4; i++) {
-                    const osc = audioCtx.createOscillator();
-                    const gain = audioCtx.createGain();
-                    osc.connect(gain);
-                    gain.connect(audioCtx.destination);
-                    osc.frequency.value = i % 2 === 0 ? 880 : 660;
-                    osc.type = 'square';
-                    gain.gain.setValueAtTime(0.5, t);
-                    gain.gain.exponentialRampToValueAtTime(0.01, t + 0.25);
-                    osc.start(t);
-                    osc.stop(t + 0.25);
-                    t += 0.3;
+                if (alarmMode === 'both' || alarmMode === 'sound') {
+                    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                    let t = audioCtx.currentTime;
+                    for (let i = 0; i < 4; i++) {
+                        const osc = audioCtx.createOscillator();
+                        const gain = audioCtx.createGain();
+                        osc.connect(gain);
+                        gain.connect(audioCtx.destination);
+                        osc.frequency.value = i % 2 === 0 ? 880 : 660;
+                        osc.type = 'square';
+                        gain.gain.setValueAtTime(0.5, t);
+                        gain.gain.exponentialRampToValueAtTime(0.01, t + 0.25);
+                        osc.start(t);
+                        osc.stop(t + 0.25);
+                        t += 0.3;
+                    }
+                    setTimeout(() => { audioCtx.close(); }, 1500);
                 }
-                if (navigator.vibrate) {
-                    navigator.vibrate([300, 100, 300]);
+                if (alarmMode === 'both' || alarmMode === 'vibrate') {
+                    if (navigator.vibrate) {
+                        navigator.vibrate([300, 100, 300, 100, 300]);
+                    }
                 }
                 setTimeout(() => {
-                    audioCtx.close();
                     btn.classList.remove('testing');
-                    btn.textContent = 'Test Alarm';
+                    btn.textContent = 'Test';
                 }, 1500);
             } catch(e) {
                 console.error('Test audio failed:', e);
                 btn.classList.remove('testing');
-                btn.textContent = 'Test Alarm';
+                btn.textContent = 'Test';
             }
         });
 
