@@ -125,7 +125,7 @@
 
         .search-box {
             width: 100%;
-            padding: 12px 16px;
+            padding: 12px 40px 12px 16px;
             border: none;
             border-radius: 12px;
             background: rgba(22, 33, 62, 0.95);
@@ -137,6 +137,25 @@
 
         .search-box::placeholder {
             color: #888;
+        }
+
+        .search-clear {
+            position: absolute;
+            right: 12px;
+            top: 0;
+            height: 44px;
+            background: none;
+            border: none;
+            color: #888;
+            font-size: 20px;
+            cursor: pointer;
+            padding: 0 4px;
+            line-height: 44px;
+            display: none;
+        }
+
+        .search-clear.visible {
+            display: block;
         }
 
         .search-results {
@@ -318,8 +337,8 @@
 
         .radius-slider::-webkit-slider-thumb {
             -webkit-appearance: none;
-            width: 24px;
-            height: 24px;
+            width: 20px;
+            height: 20px;
             border-radius: 50%;
             background: #e94560;
             cursor: pointer;
@@ -327,8 +346,8 @@
         }
 
         .radius-slider::-moz-range-thumb {
-            width: 24px;
-            height: 24px;
+            width: 20px;
+            height: 20px;
             border-radius: 50%;
             background: #e94560;
             cursor: pointer;
@@ -340,12 +359,12 @@
         .radius-presets {
             display: flex;
             gap: 6px;
-            margin-top: 8px;
+            margin-top: 14px;
         }
 
         .preset-btn {
             flex: 1;
-            padding: 6px 0;
+            padding: 8px 0;
             background: #0f3460;
             border: none;
             border-radius: 8px;
@@ -408,6 +427,10 @@
             background: #0f3460;
             color: #888;
             flex: 0.3;
+        }
+
+        .btn-clear:disabled {
+            opacity: 0.4;
         }
 
         .btn-test {
@@ -482,22 +505,17 @@
 
         /* Instructions overlay */
         .instructions {
-            position: absolute;
-            bottom: 212px;
-            left: 10px;
-            right: 10px;
-            z-index: 999;
-            background: rgba(22, 33, 62, 0.9);
+            background: rgba(15, 52, 96, 0.5);
             border-radius: 12px;
             padding: 16px;
             text-align: center;
-            backdrop-filter: blur(10px);
+            margin-bottom: 12px;
             pointer-events: none;
             transition: opacity 0.3s;
         }
 
         .instructions.hidden {
-            opacity: 0;
+            display: none;
         }
 
         .instructions p {
@@ -576,16 +594,17 @@
 
     <div class="search-container">
         <input type="text" class="search-box" id="searchBox" placeholder="Search for a destination..." autocomplete="off">
+        <button class="search-clear" id="searchClear">&times;</button>
         <div class="search-results" id="searchResults"></div>
     </div>
 
     <div class="favourites-bar" id="favouritesBar"></div>
 
-    <div class="instructions" id="instructions">
-        <p><strong>Search</strong> for a place or <strong>tap the map</strong> to set your destination, then hit <strong>Start</strong>.</p>
-    </div>
-
     <div class="bottom-panel">
+        <div class="instructions" id="instructions">
+            <p><strong>Search</strong> for a place or <strong>tap the map</strong> to set your destination, then hit <strong>Start</strong>.</p>
+        </div>
+
         <div class="dest-info" id="destInfo">
             <div class="dest-header">
                 <div class="dest-name" id="destName">--</div>
@@ -597,7 +616,7 @@
         <div class="radius-control">
             <div class="radius-label">
                 <span>Alert when within:</span>
-                <span class="radius-value" id="radiusValue">1.0 mi</span>
+                <span class="radius-value" id="radiusValue">1.0 miles</span>
             </div>
             <input type="range" class="radius-slider" id="radiusSlider" min="0.1" max="5" step="0.1" value="1.0">
             <div class="radius-presets" id="radiusPresets">
@@ -610,9 +629,9 @@
         </div>
 
         <div class="btn-row">
-            <button class="btn btn-clear" id="btnClear">Clear</button>
+            <button class="btn btn-clear" id="btnClear" disabled>Clear</button>
             <button class="btn btn-test" id="btnTest">Test Alarm</button>
-            <button class="btn btn-start" id="btnStart" disabled>Pick a stop</button>
+            <button class="btn btn-start" id="btnStart" disabled>Set destination</button>
             <button class="btn btn-stop" id="btnStop">Stop</button>
         </div>
         <div class="awake-notice" id="awakeNotice"></div>
@@ -638,7 +657,7 @@
         let map, userMarker, destMarker, radiusCircle;
         let destination = null;       // { lat, lng, name }
         let alertRadius = 1.0;        // always stored in miles internally
-        let useMetric = false;        // false = miles, true = km
+        let useMetric = localStorage.getItem('wakestop_metric') === 'true';
         let tracking = false;
         let watchId = null;
         let alarmActive = false;
@@ -655,7 +674,7 @@
         }
 
         function displayUnit() {
-            return useMetric ? 'km' : 'mi';
+            return useMetric ? 'km' : 'miles';
         }
 
         function displayRadius(miles) {
@@ -720,15 +739,24 @@
         // ===================== SEARCH =====================
         const searchBox = document.getElementById('searchBox');
         const searchResults = document.getElementById('searchResults');
+        const searchClear = document.getElementById('searchClear');
 
         searchBox.addEventListener('input', function() {
             clearTimeout(searchTimeout);
             const query = this.value.trim();
+            searchClear.classList.toggle('visible', query.length > 0);
             if (query.length < 3) {
                 searchResults.classList.remove('visible');
                 return;
             }
             searchTimeout = setTimeout(() => searchPlaces(query), 400);
+        });
+
+        searchClear.addEventListener('click', function() {
+            searchBox.value = '';
+            searchResults.classList.remove('visible');
+            this.classList.remove('visible');
+            searchBox.focus();
         });
 
         searchBox.addEventListener('focus', function() {
@@ -795,6 +823,7 @@
             document.getElementById('destInfo').classList.add('visible');
             document.getElementById('btnStart').disabled = false;
             document.getElementById('btnStart').textContent = 'Start';
+            document.getElementById('btnClear').disabled = false;
             document.getElementById('instructions').classList.add('hidden');
             updateFavButton();
         }
@@ -824,10 +853,15 @@
         });
 
         // ===================== RADIUS PRESETS =====================
+        const milesPresets = [0.25, 0.5, 1, 2, 5];
+        const kmPresets = [0.5, 1, 2.5, 5, 8];
         const presetBtns = document.querySelectorAll('.preset-btn');
+
         presetBtns.forEach(btn => {
             btn.addEventListener('click', function() {
-                alertRadius = parseFloat(this.dataset.value);
+                const val = parseFloat(this.dataset.value);
+                // data-value is always in the current unit; convert km to miles for internal storage
+                alertRadius = useMetric ? val / 1.60934 : val;
                 radiusSlider.value = alertRadius;
                 radiusValueEl.textContent = displayRadius(alertRadius) + ' ' + displayUnit();
                 updateRadiusCircle();
@@ -838,25 +872,29 @@
         function updatePresetHighlight() {
             presetBtns.forEach(btn => {
                 const val = parseFloat(btn.dataset.value);
-                btn.classList.toggle('active', Math.abs(val - alertRadius) < 0.01);
+                const current = useMetric ? alertRadius * 1.60934 : alertRadius;
+                btn.classList.toggle('active', Math.abs(val - current) < 0.05);
             });
         }
 
         function updatePresetLabels() {
-            presetBtns.forEach(btn => {
-                const miles = parseFloat(btn.dataset.value);
-                btn.textContent = displayRadius(miles);
+            const values = useMetric ? kmPresets : milesPresets;
+            presetBtns.forEach((btn, i) => {
+                btn.dataset.value = values[i];
+                btn.textContent = values[i];
             });
         }
 
         // ===================== UNIT TOGGLE =====================
         document.getElementById('unitToggle').addEventListener('click', function() {
             useMetric = !useMetric;
+            localStorage.setItem('wakestop_metric', useMetric);
             this.textContent = useMetric ? 'km' : 'mi';
 
             // Update slider max for metric (8 km ~ 5 mi)
             radiusValueEl.textContent = displayRadius(alertRadius) + ' ' + displayUnit();
             updatePresetLabels();
+            updatePresetHighlight();
 
             // Update distance display if destination set
             if (destination) {
@@ -869,6 +907,13 @@
                 }
             }
         });
+
+        // Apply saved unit preference on load
+        if (useMetric) {
+            document.getElementById('unitToggle').textContent = 'km';
+            radiusValueEl.textContent = displayRadius(alertRadius) + ' ' + displayUnit();
+            updatePresetLabels();
+        }
 
         // ===================== FAVOURITES =====================
         function renderFavourites() {
@@ -1201,9 +1246,11 @@
             document.getElementById('destName').textContent = '--';
             document.getElementById('destDistance').innerHTML = '-- <span class="unit">away</span>';
             document.getElementById('btnStart').disabled = true;
-            document.getElementById('btnStart').textContent = 'Pick a stop';
+            document.getElementById('btnStart').textContent = 'Set destination';
+            document.getElementById('btnClear').disabled = true;
             document.getElementById('instructions').classList.remove('hidden');
             searchBox.value = '';
+            searchClear.classList.remove('visible');
             updateFavButton();
         });
     </script>
