@@ -400,7 +400,7 @@
             gap: 6px;
         }
 
-        .alarm-mode-btn {
+        .alarm-sound-btn, .alarm-mode-btn {
             flex: 1;
             padding: 8px 0;
             background: #0f3460;
@@ -413,13 +413,19 @@
             transition: all 0.15s;
         }
 
-        .alarm-mode-btn.active {
+        .alarm-sound-btn {
+            flex: 2;
             background: #e94560;
             color: #fff;
         }
 
-        .alarm-mode-btn:active {
+        .alarm-sound-btn:active, .alarm-mode-btn:active {
             transform: scale(0.95);
+        }
+
+        .alarm-mode-btn.active {
+            background: #4ecca3;
+            color: #1a1a2e;
         }
 
         /* Buttons */
@@ -667,11 +673,10 @@
         </div>
 
         <div class="alarm-mode">
-            <div class="alarm-mode-label">Alarm type:</div>
-            <div class="alarm-mode-options" id="alarmModeOptions">
-                <button class="alarm-mode-btn active" data-mode="both">&#128264; + Vibrate</button>
-                <button class="alarm-mode-btn" data-mode="sound">&#128264; Sound</button>
-                <button class="alarm-mode-btn" data-mode="vibrate">Vibrate</button>
+            <div class="alarm-mode-label">Alarm sound:</div>
+            <div class="alarm-mode-options">
+                <button class="alarm-sound-btn" id="alarmSoundBtn">&#128264; Siren</button>
+                <button class="alarm-mode-btn" id="vibrateToggle">Vibrate: ON</button>
             </div>
         </div>
 
@@ -712,7 +717,8 @@
         let wakeLock = null;
         let searchTimeout = null;
         let dimmed = false;
-        let alarmMode = localStorage.getItem('wakestop_alarm_mode') || 'both'; // 'both', 'sound', 'vibrate'
+        let alarmSoundIndex = parseInt(localStorage.getItem('wakestop_sound') || '0');
+        let vibrateEnabled = localStorage.getItem('wakestop_vibrate') !== 'false';
         let favourites = JSON.parse(localStorage.getItem('wakestop_favs') || '[]');
 
         // ===================== UNIT HELPERS =====================
@@ -963,21 +969,68 @@
             updatePresetLabels();
         }
 
-        // ===================== ALARM MODE =====================
-        const alarmModeBtns = document.querySelectorAll('.alarm-mode-btn');
+        // ===================== ALARM SOUNDS =====================
+        const alarmSounds = [
+            { name: 'Siren', type: 'square', freqs: [880, 660], speed: 0.3 },
+            { name: 'Rapid beep', type: 'square', freqs: [1000, 1000], speed: 0.15 },
+            { name: 'Gentle', type: 'sine', freqs: [523, 659], speed: 0.5 },
+            { name: 'Buzzer', type: 'sawtooth', freqs: [200, 250], speed: 0.4 }
+        ];
 
-        // Apply saved alarm mode on load
-        alarmModeBtns.forEach(btn => {
-            btn.classList.toggle('active', btn.dataset.mode === alarmMode);
+        const alarmSoundBtn = document.getElementById('alarmSoundBtn');
+        const vibrateToggle = document.getElementById('vibrateToggle');
+
+        function updateSoundBtnLabel() {
+            alarmSoundBtn.innerHTML = '&#128264; ' + alarmSounds[alarmSoundIndex].name;
+        }
+
+        function updateVibrateBtn() {
+            vibrateToggle.textContent = vibrateEnabled ? 'Vibrate: ON' : 'Vibrate: OFF';
+            vibrateToggle.classList.toggle('active', vibrateEnabled);
+        }
+
+        // Apply saved state on load
+        updateSoundBtnLabel();
+        updateVibrateBtn();
+
+        alarmSoundBtn.addEventListener('click', function() {
+            alarmSoundIndex = (alarmSoundIndex + 1) % alarmSounds.length;
+            localStorage.setItem('wakestop_sound', alarmSoundIndex);
+            updateSoundBtnLabel();
+            // Play a quick preview
+            previewSound(alarmSounds[alarmSoundIndex]);
         });
 
-        alarmModeBtns.forEach(btn => {
-            btn.addEventListener('click', function() {
-                alarmMode = this.dataset.mode;
-                localStorage.setItem('wakestop_alarm_mode', alarmMode);
-                alarmModeBtns.forEach(b => b.classList.toggle('active', b === this));
-            });
+        vibrateToggle.addEventListener('click', function() {
+            vibrateEnabled = !vibrateEnabled;
+            localStorage.setItem('wakestop_vibrate', vibrateEnabled);
+            updateVibrateBtn();
+            if (vibrateEnabled && navigator.vibrate) {
+                navigator.vibrate([150]);
+            }
         });
+
+        function previewSound(sound) {
+            try {
+                const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                let t = ctx.currentTime;
+                for (let i = 0; i < 3; i++) {
+                    const freq = sound.freqs[i % sound.freqs.length];
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+                    osc.connect(gain);
+                    gain.connect(ctx.destination);
+                    osc.frequency.value = freq;
+                    osc.type = sound.type;
+                    gain.gain.setValueAtTime(0.3, t);
+                    gain.gain.exponentialRampToValueAtTime(0.01, t + sound.speed * 0.8);
+                    osc.start(t);
+                    osc.stop(t + sound.speed * 0.8);
+                    t += sound.speed;
+                }
+                setTimeout(() => ctx.close(), 2000);
+            } catch(e) {}
+        }
 
         // ===================== FAVOURITES =====================
         function renderFavourites() {
@@ -1165,11 +1218,9 @@
                 `You're ${distDisplay} ${unit} from ${destination.name}`;
             document.getElementById('alarmOverlay').classList.add('active');
 
-            if (alarmMode === 'both' || alarmMode === 'sound') {
-                playAlarm();
-            }
+            playAlarm();
 
-            if (alarmMode === 'both' || alarmMode === 'vibrate') {
+            if (vibrateEnabled) {
                 startVibration();
             }
         }
@@ -1211,31 +1262,30 @@
 
         function playAlarm() {
             try {
+                const sound = alarmSounds[alarmSoundIndex];
                 const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
                 alarmSound = audioCtx;
 
                 function scheduleBeeps() {
                     let t = audioCtx.currentTime;
                     for (let i = 0; i < 30; i++) {
-                        // Loud, urgent two-tone siren
-                        createBeep(audioCtx, t, 880, 0.5);
-                        t += 0.3;
-                        createBeep(audioCtx, t, 660, 0.5);
-                        t += 0.3;
+                        const freq = sound.freqs[i % sound.freqs.length];
+                        createBeep(audioCtx, t, freq, 0.5, sound.type, sound.speed);
+                        t += sound.speed;
                     }
                 }
 
-                function createBeep(ctx, startTime, freq, vol) {
+                function createBeep(ctx, startTime, freq, vol, type, speed) {
                     const osc = ctx.createOscillator();
                     const gain = ctx.createGain();
                     osc.connect(gain);
                     gain.connect(ctx.destination);
                     osc.frequency.value = freq;
-                    osc.type = 'square';
+                    osc.type = type;
                     gain.gain.setValueAtTime(vol, startTime);
-                    gain.gain.exponentialRampToValueAtTime(0.01, startTime + 0.25);
+                    gain.gain.exponentialRampToValueAtTime(0.01, startTime + speed * 0.8);
                     osc.start(startTime);
-                    osc.stop(startTime + 0.25);
+                    osc.stop(startTime + speed * 0.8);
                 }
 
                 scheduleBeeps();
@@ -1266,30 +1316,28 @@
             btn.textContent = 'TESTING...';
 
             try {
-                if (alarmMode === 'both' || alarmMode === 'sound') {
-                    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-                    let t = audioCtx.currentTime;
-                    for (let i = 0; i < 4; i++) {
-                        const osc = audioCtx.createOscillator();
-                        const gain = audioCtx.createGain();
-                        osc.connect(gain);
-                        gain.connect(audioCtx.destination);
-                        osc.frequency.value = i % 2 === 0 ? 880 : 660;
-                        osc.type = 'square';
-                        gain.gain.setValueAtTime(0.5, t);
-                        gain.gain.exponentialRampToValueAtTime(0.01, t + 0.25);
-                        osc.start(t);
-                        osc.stop(t + 0.25);
-                        t += 0.3;
-                    }
-                    setTimeout(() => { audioCtx.close(); }, 1500);
+                const sound = alarmSounds[alarmSoundIndex];
+                const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                let t = audioCtx.currentTime;
+                for (let i = 0; i < 4; i++) {
+                    const freq = sound.freqs[i % sound.freqs.length];
+                    const osc = audioCtx.createOscillator();
+                    const gain = audioCtx.createGain();
+                    osc.connect(gain);
+                    gain.connect(audioCtx.destination);
+                    osc.frequency.value = freq;
+                    osc.type = sound.type;
+                    gain.gain.setValueAtTime(0.5, t);
+                    gain.gain.exponentialRampToValueAtTime(0.01, t + sound.speed * 0.8);
+                    osc.start(t);
+                    osc.stop(t + sound.speed * 0.8);
+                    t += sound.speed;
                 }
-                if (alarmMode === 'both' || alarmMode === 'vibrate') {
-                    if (navigator.vibrate) {
-                        navigator.vibrate([300, 100, 300, 100, 300]);
-                    }
+                if (vibrateEnabled && navigator.vibrate) {
+                    navigator.vibrate([300, 100, 300, 100, 300]);
                 }
                 setTimeout(() => {
+                    audioCtx.close();
                     btn.classList.remove('testing');
                     btn.textContent = 'Test';
                 }, 1500);
