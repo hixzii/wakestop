@@ -68,7 +68,7 @@
             gap: 10px;
         }
 
-        .unit-toggle {
+        .header-btn {
             background: #0f3460;
             border: none;
             color: #888;
@@ -81,8 +81,14 @@
             letter-spacing: 0.5px;
         }
 
-        .unit-toggle.active {
+        .header-btn.active {
             color: #4ecca3;
+        }
+
+        .dark-mode-toggle {
+            font-size: 16px;
+            padding: 3px 8px;
+            line-height: 1;
         }
 
         .status-dot {
@@ -348,7 +354,7 @@
 
         .slider-tooltip {
             position: absolute;
-            top: 28px;
+            bottom: 58px;
             background: #e94560;
             color: #fff;
             font-size: 12px;
@@ -365,12 +371,12 @@
         .slider-tooltip::after {
             content: '';
             position: absolute;
-            bottom: -4px;
+            top: -5px;
             left: 50%;
             transform: translateX(-50%);
             border-left: 5px solid transparent;
             border-right: 5px solid transparent;
-            border-top: 5px solid #e94560;
+            border-bottom: 5px solid #e94560;
         }
 
         .slider-tooltip.visible {
@@ -686,7 +692,8 @@
             <h1>Wake<span>Stop</span></h1>
         </div>
         <div class="header-controls">
-            <button class="unit-toggle active" id="unitToggle">mi</button>
+            <button class="header-btn dark-mode-toggle" id="darkModeToggle" title="Toggle dark map">&#9790;</button>
+            <button class="header-btn active" id="unitToggle">mi</button>
             <div class="status-dot" id="statusDot"></div>
         </div>
     </div>
@@ -803,11 +810,35 @@
             attributionControl: false
         }).setView([51.505, -0.09], 13);
 
-        // CartoDB Voyager - clean, slightly colourful style
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+        // Map tile layers
+        let darkMap = localStorage.getItem('wakestop_darkmap') === 'true';
+        const lightTiles = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
             maxZoom: 19,
             subdomains: 'abcd'
-        }).addTo(map);
+        });
+        const darkTiles = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+            maxZoom: 19,
+            subdomains: 'abcd'
+        });
+        (darkMap ? darkTiles : lightTiles).addTo(map);
+
+        const darkModeBtn = document.getElementById('darkModeToggle');
+        if (darkMap) darkModeBtn.classList.add('active');
+
+        darkModeBtn.addEventListener('click', function() {
+            darkMap = !darkMap;
+            localStorage.setItem('wakestop_darkmap', darkMap);
+            if (darkMap) {
+                map.removeLayer(lightTiles);
+                darkTiles.addTo(map);
+                this.classList.add('active');
+            } else {
+                map.removeLayer(darkTiles);
+                lightTiles.addTo(map);
+                this.classList.remove('active');
+            }
+            updateRadiusCircle();
+        });
 
         // Try to center on user location and show blue dot
         if (navigator.geolocation) {
@@ -990,11 +1021,12 @@
         function updateRadiusCircle() {
             if (!destination) return;
             if (radiusCircle) map.removeLayer(radiusCircle);
+            const ringColor = darkMap ? '#4ecca3' : '#e94560';
             radiusCircle = L.circle([destination.lat, destination.lng], {
                 radius: alertRadius * 1609.34,
-                color: '#e94560',
-                fillColor: '#e94560',
-                fillOpacity: 0.15,
+                color: ringColor,
+                fillColor: ringColor,
+                fillOpacity: darkMap ? 0.12 : 0.15,
                 weight: 3,
                 dashArray: '8, 6'
             }).addTo(map);
