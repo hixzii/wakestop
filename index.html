@@ -237,10 +237,33 @@
         .bottom-panel {
             background: #16213e;
             border-top: 1px solid #0f3460;
-            padding: 16px;
             flex-shrink: 0;
             z-index: 1000;
-            transition: transform 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .panel-handle {
+            width: 40px;
+            height: 4px;
+            background: #555;
+            border-radius: 2px;
+            margin: 12px auto;
+            cursor: pointer;
+        }
+
+        .panel-content {
+            padding: 0 16px 16px;
+            transition: max-height 0.35s ease, opacity 0.25s ease;
+            max-height: 500px;
+            opacity: 1;
+            overflow: hidden;
+        }
+
+        .bottom-panel.collapsed .panel-content {
+            max-height: 0;
+            opacity: 0;
+            padding-bottom: 0;
         }
 
         /* Destination info */
@@ -644,7 +667,9 @@
 
     <div class="favourites-bar" id="favouritesBar"></div>
 
-    <div class="bottom-panel">
+    <div class="bottom-panel" id="bottomPanel">
+        <div class="panel-handle" id="panelHandle"></div>
+        <div class="panel-content">
         <div class="instructions" id="instructions">
             <p><strong>Search</strong> for a place or <strong>tap the map</strong> to set your destination, then hit <strong>Start</strong>.</p>
         </div>
@@ -687,6 +712,7 @@
             <button class="btn btn-stop" id="btnStop">Stop</button>
         </div>
         <div class="awake-notice" id="awakeNotice"></div>
+        </div>
     </div>
 
     <div class="alarm-overlay" id="alarmOverlay">
@@ -748,20 +774,57 @@
             subdomains: 'abcd'
         }).addTo(map);
 
-        // Try to center on user location
+        // Try to center on user location and show blue dot
         if (navigator.geolocation) {
             navigator.geolocation.getCurrentPosition(
                 pos => {
-                    map.setView([pos.coords.latitude, pos.coords.longitude], 14);
+                    const { latitude, longitude } = pos.coords;
+                    map.setView([latitude, longitude], 14);
+                    if (userMarker) map.removeLayer(userMarker);
+                    userMarker = L.circleMarker([latitude, longitude], {
+                        radius: 8,
+                        fillColor: '#4285f4',
+                        fillOpacity: 1,
+                        color: '#fff',
+                        weight: 3
+                    }).addTo(map);
                 },
                 () => {},
                 { enableHighAccuracy: true }
             );
         }
 
+        // ===================== PANEL COLLAPSE =====================
+        const bottomPanel = document.getElementById('bottomPanel');
+        let panelCollapsed = false;
+
+        function collapsePanel() {
+            if (panelCollapsed || tracking) return;
+            panelCollapsed = true;
+            bottomPanel.classList.add('collapsed');
+        }
+
+        function expandPanel() {
+            if (!panelCollapsed) return;
+            panelCollapsed = false;
+            bottomPanel.classList.remove('collapsed');
+        }
+
+        document.getElementById('panelHandle').addEventListener('click', function(e) {
+            e.stopPropagation();
+            if (panelCollapsed) expandPanel();
+            else collapsePanel();
+        });
+
+        // Collapse panel when user starts moving/zooming the map
+        map.on('dragstart', function() {
+            if (!tracking) collapsePanel();
+        });
+
         // ===================== MAP TAP =====================
         map.on('click', function(e) {
             if (tracking) return;
+            expandPanel();
             // Reverse geocode to get a real place name
             reverseGeocode(e.latlng.lat, e.latlng.lng);
         });
@@ -857,6 +920,7 @@
         // ===================== SET DESTINATION =====================
         function setDestination(lat, lng, name) {
             destination = { lat, lng, name };
+            expandPanel();
 
             // Marker
             if (destMarker) map.removeLayer(destMarker);
