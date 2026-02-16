@@ -354,7 +354,7 @@
 
         .slider-tooltip {
             position: absolute;
-            bottom: 58px;
+            bottom: 67px;
             background: #e94560;
             color: #fff;
             font-size: 12px;
@@ -371,12 +371,12 @@
         .slider-tooltip::after {
             content: '';
             position: absolute;
-            top: -5px;
+            bottom: -5px;
             left: 50%;
             transform: translateX(-50%);
             border-left: 5px solid transparent;
             border-right: 5px solid transparent;
-            border-bottom: 5px solid #e94560;
+            border-top: 5px solid #e94560;
         }
 
         .slider-tooltip.visible {
@@ -475,32 +475,21 @@
             gap: 6px;
         }
 
-        .alarm-sound-btn, .alarm-mode-btn {
+        .alarm-sound-btn {
             flex: 1;
             padding: 8px 0;
-            background: #0f3460;
+            background: #e94560;
             border: none;
             border-radius: 8px;
-            color: #888;
+            color: #fff;
             font-size: 13px;
             font-weight: 600;
             cursor: pointer;
             transition: all 0.15s;
         }
 
-        .alarm-sound-btn {
-            flex: 2;
-            background: #e94560;
-            color: #fff;
-        }
-
-        .alarm-sound-btn:active, .alarm-mode-btn:active {
+        .alarm-sound-btn:active {
             transform: scale(0.95);
-        }
-
-        .alarm-mode-btn.active {
-            background: #4ecca3;
-            color: #1a1a2e;
         }
 
         /* Buttons */
@@ -693,6 +682,7 @@
         </div>
         <div class="header-controls">
             <button class="header-btn dark-mode-toggle" id="darkModeToggle" title="Toggle dark map">&#9790;</button>
+            <button class="header-btn dark-mode-toggle" id="vibrateToggle" title="Toggle vibration">&#128243;</button>
             <button class="header-btn active" id="unitToggle">mi</button>
             <div class="status-dot" id="statusDot"></div>
         </div>
@@ -744,7 +734,6 @@
             <div class="alarm-mode-label">Alarm sound:</div>
             <div class="alarm-mode-options">
                 <button class="alarm-sound-btn" id="alarmSoundBtn">&#128264; Siren</button>
-                <button class="alarm-mode-btn" id="vibrateToggle">Vibrate: ON</button>
             </div>
         </div>
 
@@ -1155,8 +1144,9 @@
         }
 
         function updateVibrateBtn() {
-            vibrateToggle.textContent = vibrateEnabled ? 'Vibrate: ON' : 'Vibrate: OFF';
+            vibrateToggle.innerHTML = '&#128243;';
             vibrateToggle.classList.toggle('active', vibrateEnabled);
+            vibrateToggle.title = vibrateEnabled ? 'Vibration on' : 'Vibration off';
         }
 
         // Apply saved state on load
